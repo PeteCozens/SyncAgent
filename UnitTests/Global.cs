@@ -1,12 +1,10 @@
 ﻿using Common;
-using Infrastructure.Services.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Serilog;
 using System.Diagnostics.CodeAnalysis;
-using UnitTests.Internal;
 
 namespace UnitTests
 {
@@ -47,8 +45,6 @@ namespace UnitTests
                 builder.AddConsole();
                 builder.SetMinimumLevel(LogLevel.Debug);    
             });
-
-            serviceCollection.AddSingleton<IAuthenticatedIdentity, UnitTestUserIdentity>();
 
             return serviceCollection;
         }

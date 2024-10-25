@@ -2,6 +2,7 @@
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 
@@ -87,25 +88,36 @@ namespace Infrastructure.Services.Repositories
 
         #endregion
 
-        public string BaseCurrency => "EUR";
+        //public string BaseCurrency => "EUR";
 
-        public Task<List<Currency>> GetCurrenciesAsync(Expression<Func<Currency, bool>>? filter = null, bool withTracking = false, bool includeDeleted = false, params Expression<Func<Currency, object?>>[] propertiesToInclude)
-             => Get(ctx.Currencies, filter, withTracking, includeDeleted, propertiesToInclude).ToListAsync();
-        public Task<List<TResult>> SelectCurrenciesAsync<TResult>(Expression<Func<Currency, TResult>> selector, Expression<Func<Currency, bool>>? filter = null,
-                bool includeDeleted = false, params Expression<Func<Currency, object?>>[] propertiesToInclude)
-            => Get(ctx.Currencies, filter, false, includeDeleted, propertiesToInclude).Select(selector).ToListAsync();
-        public Task<Currency> SaveAsync(Currency value, bool autoFlush = true)
-            => SaveAsync(ctx.Currencies, value, value.SysRowVersion.Length == 0, autoFlush);
+        //public Task<List<Currency>> GetCurrenciesAsync(Expression<Func<Currency, bool>>? filter = null, bool withTracking = false, bool includeDeleted = false, params Expression<Func<Currency, object?>>[] propertiesToInclude)
+        //     => Get(ctx.Currencies, filter, withTracking, includeDeleted, propertiesToInclude).ToListAsync();
+        //public Task<List<TResult>> SelectCurrenciesAsync<TResult>(Expression<Func<Currency, TResult>> selector, Expression<Func<Currency, bool>>? filter = null,
+        //        bool includeDeleted = false, params Expression<Func<Currency, object?>>[] propertiesToInclude)
+        //    => Get(ctx.Currencies, filter, false, includeDeleted, propertiesToInclude).Select(selector).ToListAsync();
+        //public Task<Currency> SaveAsync(Currency value, bool autoFlush = true)
+        //    => SaveAsync(ctx.Currencies, value, value.SysRowVersion.Length == 0, autoFlush);
 
 
 
-        public Task<List<FxRate>> GetRatesAsync(Expression<Func<FxRate, bool>>? filter = null, bool withTracking = false, bool includeDeleted = false, params Expression<Func<FxRate, object?>>[] propertiesToInclude)
-             => Get(ctx.FxRates, filter, withTracking, includeDeleted, propertiesToInclude).ToListAsync();
+        //public Task<List<FxRate>> GetRatesAsync(Expression<Func<FxRate, bool>>? filter = null, bool withTracking = false, bool includeDeleted = false, params Expression<Func<FxRate, object?>>[] propertiesToInclude)
+        //     => Get(ctx.FxRates, filter, withTracking, includeDeleted, propertiesToInclude).ToListAsync();
 
-        public Task<List<TResult>> SelectRatesAsync<TResult>(Expression<Func<FxRate, TResult>> selector, Expression<Func<FxRate, bool>>? filter = null,
-                bool includeDeleted = false, params Expression<Func<FxRate, object?>>[] propertiesToInclude)
-            => Get(ctx.FxRates, filter, false, includeDeleted, propertiesToInclude).Select(selector).ToListAsync();
-        public Task<FxRate> SaveAsync(FxRate value, bool autoFlush = true)
-            => SaveAsync(ctx.FxRates, value, value.SysRowVersion.Length == 0, autoFlush);
+        //public Task<List<TResult>> SelectRatesAsync<TResult>(Expression<Func<FxRate, TResult>> selector, Expression<Func<FxRate, bool>>? filter = null,
+        //        bool includeDeleted = false, params Expression<Func<FxRate, object?>>[] propertiesToInclude)
+        //    => Get(ctx.FxRates, filter, false, includeDeleted, propertiesToInclude).Select(selector).ToListAsync();
+        //public Task<FxRate> SaveAsync(FxRate value, bool autoFlush = true)
+        //    => SaveAsync(ctx.FxRates, value, value.SysRowVersion.Length == 0, autoFlush);
+
+        public Task<List<Progress>> GetProgressAsync(Expression<Func<Progress, bool>>? filter = null, bool withTracking = false, bool includeDeleted = false,
+                params Expression<Func<Progress, object?>>[] propertiesToInclude)
+            => Get(ctx.Progress, filter, withTracking, includeDeleted, propertiesToInclude).ToListAsync();
+
+        public Task<List<TResult>> SelectProgressAsync<TResult>(Expression<Func<Progress, TResult>> selector, Expression<Func<Progress, bool>>? filter = null,
+                bool includeDeleted = false, params Expression<Func<Progress, object?>>[] propertiesToInclude)
+            => Get(ctx.Progress, filter, false, includeDeleted, propertiesToInclude).Select(selector).ToListAsync();
+
+        public Task<Progress> SaveAsync(Progress value, bool autoFlush = true)
+            => SaveAsync(ctx.Progress, value, value.SysRowVersion.Length == 0, autoFlush);
     }
 }

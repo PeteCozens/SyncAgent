@@ -1,6 +1,5 @@
 ﻿using ApplicationLogic.Extensions;
 using ApplicationLogic.Services;
-using CommandLine;
 using Common;
 using Common.Extensions;
 using Infrastructure.Data;
@@ -10,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Serilog;
 using System.Reflection;
 
@@ -49,44 +49,18 @@ namespace ConsoleApp
 
             try
             {
-                // Parse the command line
-                var result = Parser.Default.ParseArguments<CommandLineOptions>(args);   // Parse the command line and run the application. See https://github.com/commandlineparser/commandline
+                var worker = ServiceFactory.CreateInstance<SyncService>();
+                await worker.DoWorkAsync(args);
 
-                // Handle parsing errors
-
-                result = await result.WithNotParsedAsync(async errors =>                    // Command line parsing failed
-                {
-                    // Command line parsing failed
-
-                    _log.Here().LogInformation("Command Line: {commandLine}", string.Join(" ", args));
-                    HandleCommandLineError(errors);
-                    await Task.Delay(50);
-                });
-
-                // Perform application processing
-
-                result = await result.WithParsedAsync(async options =>
-                {
-                    // Command line parsed succesfully
-
-                    _log.Here().LogDebug("Command Line Options: {@options}", options);
-
-                    // Do some work
-
-                    _log.Here().LogDebug("Starting Worker");
-
-                    await DoWorkAsync(options);
-
-                    _log.Here().LogDebug("Worker Complete");
-                });
-
-                return !result.Errors.Any() ? 1 : 0;
+                return 0; // No Errors
             }
             catch (Exception e)
             {
                 _log.Here().LogError(e, "Unhandled Exception");
-                return 0;
+
+                return 1; // Error(s) Occurred
             }
+
         }
 
         private static IHost BuildHost(string[] args)
@@ -139,39 +113,5 @@ namespace ConsoleApp
                 .Build();
         }
 
-        private static void HandleCommandLineError(IEnumerable<Error> errors)
-        {
-            _log.Here().LogError("Command Line Parsing failed with the following errors:");
-            foreach (var error in errors)
-            {
-                if (error is SetValueExceptionError)
-                {
-                    if (error is not SetValueExceptionError e)
-                        continue;
-
-                    var ex = e.Exception;
-                    var msg = ex.Message;
-                    while (ex.InnerException != null)
-                    {
-                        if (msg.Right(1) != ".")
-                            msg += ".";
-                        msg += $" {ex.InnerException.Message}";
-                        ex = ex.InnerException;
-                    }
-                    _log.Here().LogWarning("* {param}: {error}", e.NameInfo.LongName, msg);
-                }
-                else
-                {
-                    _log.Here().LogWarning("* {error}", error.ToString());
-                }
-            }
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "For demonstration purposes only. This can be removed if not reqd.")]
-        private async static Task DoWorkAsync(CommandLineOptions options)
-        {
-            var worker = ServiceFactory.CreateInstance<DummyService>();
-            await worker.DoWorkAsync();
-        }
     }
 }

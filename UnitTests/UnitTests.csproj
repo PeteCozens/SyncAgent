@@ -38,4 +38,9 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="ApplicationLogic\Services\" />
+    <Folder Include="InfrastructureTests\Services\" />
+  </ItemGroup>
+
 </Project>
