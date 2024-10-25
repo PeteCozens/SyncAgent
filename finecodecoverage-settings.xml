@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<!-- See https://github.com/FortuneN/FineCodeCoverage -->
+<!-- The Fine Code Coverage UI can be found in the View \\ Other Windows menu -->
+<FineCodeCoverage>
+
+    <Enabled>
+        True
+    </Enabled>
+
+    <Include>
+        [*]*
+    </Include>
+
+    <Exclude>
+        [Common]*.Attributes.*
+        [Common]*.Models.*
+        [Infrastructure]*.Migrations.*
+        [Infrastructure]*.Models.*
+    </Exclude>
+
+    <ExcludeByFile>
+        **/Program.cs
+        **/Global.cs
+    </ExcludeByFile>
+
+</FineCodeCoverage>

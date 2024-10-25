@@ -1,0 +1,105 @@
+﻿@page "/Demo/Form"
+
+@* @using BlazorApp.Models
+@using Microsoft.AspNetCore.Mvc.Rendering;
+@inject NavigationManager NavigationManager *@
+@using BlazorApp.Components.Components
+
+@*
+    Form Layout: https://getbootstrap.com/docs/5.0/forms/overview/
+*@
+
+
+<h3>Demo Form</h3>
+
+<EditForm Model="@model" OnValidSubmit="@HandleValidSubmit" class="form-floating">
+    
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="row mb-3">
+        <label for="name" class="col-sm-2 col-form-label">Name</label>
+        <div class="col-sm-10">
+            <InputText id="name" @bind-Value="model.Name" class="form-control" />
+            <ValidationMessage For="@(() => model.Name)" />
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="password" class="col-sm-2 col-form-label">Password</label>
+        <div class="col-sm-10">
+            <InputText type="password" id="password" @bind-Value="model.Password" class="form-control" />
+            <ValidationMessage For="@(() => model.Password)" />
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="age" class="col-sm-2 col-form-label">Age</label>
+        <div class="col-sm-10">
+            <InputNumber id="age" @bind-Value="model.Age" class="form-control" />
+            <ValidationMessage For="@(() => model.Age)" />
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="birthdate" class="col-sm-2 col-form-label">Date of Birth</label>
+        <div class="col-sm-10">
+            <InputDate id="birthdate" @bind-Value="model.BirthDate" class="form-control" />
+            <ValidationMessage For="@(() => model.BirthDate)" />
+        </div>
+    </div>
+
+
+    <div class="row mb-3">
+        <label class="col-sm-2 col-form-label"></label>
+        <div class="col-sm-10">
+            <InputCheckbox id="subscribe" @bind-Value="model.IsSubscribed" class="form-check-input" />
+            <label for="subscribe">Subscribe to newsletter</label>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="description" class="col-sm-2 col-form-label">Description</label>
+        <div class="col-sm-10">
+            <InputTextArea id="description" @bind-Value="model.Description" class="form-control"></InputTextArea>
+            <ValidationMessage For="@(() => model.Description)" />
+        </div>
+    </div>
+
+
+    <div class="row mb-3">
+        <label for="color" class="col-sm-2 col-form-label">Colour</label>
+        <div class="col-sm-10">
+            <InputSelect id="color" @bind-Value="model.FavoriteColor" class="form-select">
+                <option value="">Choose a color</option>
+                <option value="Red">Red</option>
+                <option value="Green">Green</option>
+                <option value="Blue">Blue</option>
+            </InputSelect>
+            <ValidationMessage For="@(() => model.FavoriteColor)" />
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="code" class="col-sm-2 col-form-label">Options</label>
+        <div class="col-sm-10">
+            <CheckBoxList Options="model.CheckboxOptions" />
+            <ValidationMessage For="@(() => model.FavoriteColor)" />
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label class="col-sm-2 col-form-label"></label>
+        <div class="col-sm-10">
+            <button class="btn btn-primary" type="submit">Submit</button>
+        </div>
+    </div>
+
+   
+
+    
+</EditForm>
+
+@code {
+   
+}

@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="CommandLineParser" Version="2.9.1" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+        <PackageReference Include="Serilog" Version="4.1.0" />
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+        <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+        <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\ApplicationLogic\ApplicationLogic.csproj" />
+        <ProjectReference Include="..\Common\Common.csproj" />
+        <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="appsettings.test.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <DependentUpon>appsettings.json</DependentUpon>
+        </None>
+        <None Update="appsettings.development.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <DependentUpon>appsettings.json</DependentUpon>
+        </None>
+    </ItemGroup>
+    <ItemGroup>
+        <None Update="secrets.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="secrets.test.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+            <DependentUpon>secrets.json</DependentUpon>
+        </None>
+        <None Update="secrets.development.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+            <DependentUpon>secrets.json</DependentUpon>
+        </None>
+    </ItemGroup>
+
+</Project>

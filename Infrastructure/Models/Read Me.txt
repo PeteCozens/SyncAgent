@@ -1,0 +1,4 @@
+﻿
+The only model classes that should be placed in this folder are ones that are INTERNAL to the Infrastructure project.
+
+All model classes for your application should be placed in Common.Models, so that they can be used elsewhere in the solution.

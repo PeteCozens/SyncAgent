@@ -1,0 +1,21 @@
+{
+  // Database Connections
+  "ConnectionStrings": {
+    "EntityFramework": "Server=(localdb)\\MSSQLLocalDB;Database=UnitTests;MultipleActiveResultSets=true;",
+  },
+
+  // Settings for sending emails via SMTP
+  "Smtp": {
+    "FromAddress": "do.not.reply@example.com",
+    "DisplayName": "Unit Tests",
+    "Host": "localhost",
+    "Port": 25
+  },
+
+  "AzureBlobContainer": {
+    // See secrets file
+    "AccessKey": "DefaultEndpointsProtocol=https;AccountName=xxx;AccountKey=xxx;EndpointSuffix=core.windows.net",
+    "Container": "UnitTests"
+  }
+
+}

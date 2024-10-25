@@ -1,0 +1,31 @@
+﻿@page "/research/WindowsAuth"
+@inject IAuthorizationService AuthorizationService
+@inject IHttpContextAccessor HttpContextAccessor
+
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+
+[Authorize(Roles = "DOMAIN\\YourADGroup")]
+
+<h3>Windows Auth</h3>
+
+<h1>Windows Auth Test</h1>
+<p>
+    Welcome to your new app, @userName.
+</p>
+
+@if (HttpContextAccessor.HttpContext?.User?.IsInRole("DOMAIN\\YourADGroup") ?? false)
+{
+    <p>
+        Content for authorized users
+    </p>
+}
+
+@code {
+    private string userName = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        userName = HttpContextAccessor.HttpContext?.User?.Identity?.Name ?? string.Empty;
+    }
+}

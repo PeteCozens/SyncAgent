@@ -1,0 +1,10 @@
+﻿@page "/demo/configuration"
+
+@* Bring in the config from the ServiceProvider *@
+@inject IConfiguration Config  
+
+
+<h3>Configuration</h3>
+<p>
+    Value from Config: Environment = @Config["Environment"]
+</p>

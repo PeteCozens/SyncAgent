@@ -1,0 +1,10 @@
+﻿
+MS Test Cheatsheet: https://www.automatetheplanet.com/mstest-cheat-sheet
+
+Unit Test methods/classes not found?
+	- Check that they're all public
+	- TestMethods may not contain generic types as parameters
+	- Check that any Class/Test initializers are declared correctly (see the cheatsheet)
+
+Code Coverage missing?
+	- Install Fine Code Coverage from here: https://marketplace.visualstudio.com/items?itemName=FortuneNgwenya.FineCodeCoverage2022

@@ -1,0 +1,24 @@
+﻿@page "/checkboxlist"
+@using Microsoft.AspNetCore.Mvc.Rendering;
+
+<div>
+    @foreach (var option in Options)
+    {
+        <div>
+            <label>
+                <input type="checkbox" value="@option.Value" @bind="option.Selected" />
+                @option.Text<br/>
+            </label>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public List<SelectListItem> Options { get; set; }
+
+    private async Task OnOptionsChanged()
+    {
+        await Task.CompletedTask;
+    }
+}

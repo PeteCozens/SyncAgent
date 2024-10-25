@@ -1,0 +1,8 @@
+﻿        #region Temporal Table
+
+        public string SysUpdatedByUser { get; set; } = string.Empty;
+        public string SysUpdateHostMachine { get; set; } = string.Empty;
+        public bool SysIsDeleted { get; set; }
+        public byte[] SysRowVersion { get; set; } = [];
+
+        #endregion

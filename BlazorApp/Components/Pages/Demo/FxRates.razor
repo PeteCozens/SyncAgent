@@ -1,0 +1,92 @@
+﻿@page "/demo/fxrates"
+
+@using ApplicationLogic.Services
+@using BlazorApp.Components.Layout
+@using Infrastructure.Services.Repositories
+@using Common.Models
+
+@inject IConfiguration _Config
+@inject CurrencyConverterService _CurrencyConverter
+@inject IRepository _repo
+
+<HeadContent>
+   @*
+    <link href="~/select2/css/select2.min.css" rel="stylesheet" />
+    <script src="~/select2/js/select2.min.js"></script>
+    *@
+</HeadContent>
+
+<PageTitle>FX Rates</PageTitle>
+<h3>FX Rates</h3>
+
+<p>
+    Currency:
+    <select class="form-control d-flex" id="ccy" name="ccy" @onchange="OnCurrencyChange">
+        @if (Currencies != null)
+        {
+            @foreach (Currency ccy in Currencies)
+            {
+                <option value="@ccy.Code">@ccy.Description</option>
+            }
+        }
+    </select>
+</p>
+
+@if (Rates != null)
+{
+    <table class="table table-striped table-responsive">
+        <thead>
+            <tr>
+                <th>From Date</th>
+                <th>To Date</th>
+                <th>Rate</th>
+                <th>Reciprocal</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var rate in Rates)
+            {
+                <tr>
+                    <td>@rate.FromDate.ToString("dd MMM yyyy")</td>
+                    <td>@rate.ToDate.ToString("dd MMM yyyy")</td>
+                    <td>@rate.Rate.ToString("#,##0.000000")</td>
+                    <td>@rate.Reciprocal.ToString("#,##0.000000")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+
+@code {
+
+    private IEnumerable<Currency>? Currencies = null;
+    private IEnumerable<FxRate>? Rates = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Currencies = await _repo.SelectRatesAsync(x => x.Currency, x => x.FromDate <= DateTime.Today && x.ToDate >= DateTime.Today, false, x => x.Currency);
+
+        await base.OnInitializedAsync();
+    }
+
+
+    public async Task OnCurrencyChange(ChangeEventArgs e)
+    {
+        var ccyCode = e?.Value?.ToString();
+        Rates = ccyCode == null
+            ? null
+            : (await _repo.GetRatesAsync(x => x.Currency.Code == ccyCode, false, false, x => x.Currency)).OrderByDescending(x => x.FromDate);
+        StateHasChanged();
+    }
+
+    // public async Task OnCurrencyChangeAsync(ChangeEventArgs e)
+    // {
+    //     var ccyCode = e?.Value?.ToString();
+    //     Rates = ccyCode == null
+    //         ? null
+    //         : _CurrencyRepo.GetRates(ccyCode, DateTime.MinValue, DateTime.MaxValue).OrderByDescending(x => x.FromDate);
+    //     await Task.Run(StateHasChanged);
+    // }
+
+}

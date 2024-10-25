@@ -1,0 +1,34 @@
+﻿@page "/research/WindowsAuth1"
+
+@* Windows Authentication *@
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Windows Auth v1</PageTitle>
+
+<h1>Windows Auth Test</h1>
+<p>
+    Welcome to your new app, @userName.
+</p>
+
+
+@code {
+    private string userName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user?.Identity?.IsAuthenticated ?? false)
+        {
+            userName = user?.Identity.Name ?? "Not found";
+        }
+        else
+        {
+            userName = "Not authenticated";
+        }
+    }
+}
