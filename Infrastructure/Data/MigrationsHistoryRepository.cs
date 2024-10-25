@@ -12,7 +12,7 @@ namespace Infrastructure.Data
     [ExcludeFromCodeCoverage]
     [SuppressMessage("Usage", "EF1001:Internal EF Core API usage.",
         Justification = "Base class may be removed in the future, but if so, we anticipate the equivalent functionality to be provided in a new form beforehand")]
-    internal class MigrationsHistoryRepository(HistoryRepositoryDependencies dependencies) : SqlServerHistoryRepository(dependencies)
+    public class MigrationsHistoryRepository(HistoryRepositoryDependencies dependencies) : SqlServerHistoryRepository(dependencies)
     {
         protected override void ConfigureTable(EntityTypeBuilder<HistoryRow> history)
         {

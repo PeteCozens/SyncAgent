@@ -1,29 +1,19 @@
-﻿using Common.Attributes;
-using Common.Extensions;
-using Common.Models;
-using Infrastructure.Models;
+﻿using Common.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq.Expressions;
-using System.Reflection;
-using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using Common.Interfaces;
-using static Dapper.SqlMapper;
 
 namespace Infrastructure.Data
 {
     [ExcludeFromCodeCoverage]
-    public class AppDbContext(IConfiguration config, ILogger<AppDbContext> log, DbContextOptions options) : DbContext(options)
+    public class AppDbContext(IConfiguration config, ILogger<AppDbContext> log, DbContextOptions<AppDbContext> options) : DbContext(options)
     {
         private const string ConnectionStringName = "SyncAgent";
 
-        public const string DefaultDatabaseSchema = "dbo";
+        private const string DefaultDatabaseSchema = "dbo";
 
         //internal virtual DbSet<EnumValue> Enums { get; set; }
         public virtual DbSet<Progress> Progress { get; set; }
@@ -73,17 +63,21 @@ namespace Infrastructure.Data
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            if (!optionsBuilder.IsConfigured)
-            {
-                optionsBuilder
-                    .UseSqlServer(config.GetConnectionString(ConnectionStringName),
-                        options => options
-                        .MigrationsHistoryTable("__MigrationsHistory", DefaultDatabaseSchema)
-                        .MigrationsAssembly("Infrastructure")
-                    ).ReplaceService<IHistoryRepository, MigrationsHistoryRepository>();
-            }
-
+            ConfigureOptions(config, optionsBuilder);
             base.OnConfiguring(optionsBuilder);
+        }
+
+        public static void ConfigureOptions(IConfiguration config, DbContextOptionsBuilder optionsBuilder)
+        {
+            if (optionsBuilder.IsConfigured)
+                return;
+
+            optionsBuilder
+                .UseSqlServer(config.GetConnectionString(ConnectionStringName),
+                    options => options
+                    .MigrationsHistoryTable("__MigrationsHistory", DefaultDatabaseSchema)
+                    .MigrationsAssembly("Infrastructure")
+                ).ReplaceService<IHistoryRepository, MigrationsHistoryRepository>();
         }
 
         //public override int SaveChanges()
@@ -161,20 +155,22 @@ namespace Infrastructure.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            log.Here().LogDebug("Creating the Entity Framework Model");
+            //log.Here().LogDebug("Configuring the Entity Framework Model");
 
             modelBuilder.HasDefaultSchema(DefaultDatabaseSchema);
 
             //ConfigureTemporalTables(modelBuilder);
             //ConfigureDecimalDataTypes(modelBuilder);
             //ConfigureDateOnlyDataTypes(modelBuilder);
-            //ConfigureCompoundKeys(modelBuilder);
+            ConfigureCompoundKeys(modelBuilder);
             //ConfigureForeignKeys(modelBuilder);
             ConfigureRowVersions(modelBuilder);
 
             // TODO... Any additional config that can't be done in the model classes
 
+            //log.Here().LogDebug("Creating the Entity Framework Model");
             base.OnModelCreating(modelBuilder);
+            //log.Here().LogDebug("Created the Entity Framework Model");
         }
 
         /// <summary>
@@ -183,6 +179,8 @@ namespace Infrastructure.Data
         /// <param name="modelBuilder"></param>
         private void ConfigureRowVersions(ModelBuilder modelBuilder)
         {
+            //log.Here().LogDebug("Configuring Row Versions");
+
             var tt = typeof(ITemporalTable);
             var types = modelBuilder
                 .Model
@@ -296,11 +294,13 @@ namespace Infrastructure.Data
         /// Configure compound primary keys on any models that require them
         /// </summary>
         /// <param name="modelBuilder"></param>
-        //private static void ConfigureCompoundKeys(ModelBuilder modelBuilder)
-        //{
-        //    modelBuilder.Entity<EnumValue>().HasKey(x => new { x.SchemaName, x.TableName, x.ColumnName, x.Value });
-        //    modelBuilder.Entity<FxRate>().HasKey(x => new { x.CurrencyId, x.FromDate });
-        //}
+        private void ConfigureCompoundKeys(ModelBuilder modelBuilder)
+        {
+            //log.Here().LogDebug("Configuring Compound Keys");
+
+            //modelBuilder.Entity<EnumValue>().HasKey(x => new { x.SchemaName, x.TableName, x.ColumnName, x.Value });
+            modelBuilder.Entity<Progress>().HasKey(x => new { x.SyncSet, x.Field});
+        }
 
         /// <summary>
         /// Configure Foreign Keys on any models that require them

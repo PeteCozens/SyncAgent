@@ -1,15 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace Common.Models
 {
     public class Progress
     {
-        public string Name { get; set; } = string.Empty;
-        public required object Value { get; set; }
+        [StringLength(100)]
+        public required string SyncSet { get; set; }
+
+        [StringLength(100)]
+        public required string Field { get; set; }
+
+        [StringLength(100)]
+        public required string Type { get; set; }
+
+        [StringLength(100)]
+        public string? Value { get; set; }
+
         public byte[] SysRowVersion { get; set; } = [];
     }
 }

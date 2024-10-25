@@ -6,6 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AssemblyName>SyncAgent</AssemblyName>
+        <UserSecretsId>3c3b12e3-b636-4cd6-8b54-01ed57dd10f8</UserSecretsId>
     </PropertyGroup>
 
     <ItemGroup>
@@ -14,6 +15,8 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.1" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
         <PackageReference Include="Serilog" Version="4.1.0" />
         <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
@@ -39,19 +42,6 @@
         <None Update="appsettings.development.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <DependentUpon>appsettings.json</DependentUpon>
-        </None>
-    </ItemGroup>
-    <ItemGroup>
-        <None Update="secrets.json">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="secrets.test.json">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-            <DependentUpon>secrets.json</DependentUpon>
-        </None>
-        <None Update="secrets.development.json">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-            <DependentUpon>secrets.json</DependentUpon>
         </None>
     </ItemGroup>
 

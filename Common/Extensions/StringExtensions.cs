@@ -178,5 +178,32 @@ namespace Common.Extensions
             var i = value.LastIndexOf(' ');
             return i >= 0 ? value[(i + 1)..] : value;
         }
+
+        public static string ReplacePlaceholders(this string template, Dictionary<string, object> parameters)
+        {
+            return Regex.Replace(template, @"\{(\w+)\}", match =>
+            {
+                string key = match.Groups[1].Value;
+                if (parameters.ContainsKey(key))
+                {
+                    var value = parameters[key];
+                    if (value is DateTime dateTimeValue)
+                        return dateTimeValue.ToString("yyyy-MM-dd");
+
+                    return value?.ToString() ?? string.Empty;
+                }
+                return match.Value; // return the placeholder unchanged if key not found
+            });
+        }
+
+        public static List<string> ExtractSqlParameters(this string sql)
+        {
+            var parameters = new List<string>();
+            //var regex = new Regex(@"(?<!@)@\w+");
+            var regex = new Regex(@"(?<!')(?<!@)@\w+(?!')");
+            foreach (Match match in regex.Matches(sql))
+                parameters.Add(match.Value);
+            return parameters;
+        }
     }
 }
