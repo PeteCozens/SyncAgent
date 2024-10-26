@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20241025132657_Progress")]
+    [Migration("20241026064856_Progress")]
     partial class Progress
     {
         /// <inheritdoc />
@@ -35,12 +35,6 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<byte[]>("SysRowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -53,6 +47,22 @@ namespace Infrastructure.Migrations
                     b.HasKey("SyncSet", "Field");
 
                     b.ToTable("Progress", "dbo");
+                });
+
+            modelBuilder.Entity("Common.Models.Setting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("Settings", "dbo");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,6 +1,5 @@
 ﻿using Common.Extensions;
 using Infrastructure.Data;
-using Infrastructure.Services.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -19,7 +18,6 @@ namespace Infrastructure.Extensions
             // Database & Repositories
 
             services.AddDbContext<AppDbContext>(ServiceLifetime.Transient);
-            services.AddTransient<IRepository, Repository>();
 
             // Configurable Service Selection (use the "Services" section in the appsettings file to determine which services are used for each interface)
 
@@ -57,7 +55,7 @@ namespace Infrastructure.Extensions
             if (serviceConfig == null)
                 return;
 
-            var interfaceTypes = typeof(IRepository).Assembly.GetTypes().Where(x => x.IsInterface).OrderBy(x => x.Name).ToArray();
+            var interfaceTypes = typeof(AppDbContext).Assembly.GetTypes().Where(x => x.IsInterface).OrderBy(x => x.Name).ToArray();
             var serviceTypes = typeof(ServiceCollectionExtensions).Assembly.GetTypes().Where(x => x.IsClass && !x.IsAbstract).OrderBy(x => x.Name).ToArray();
 
             foreach (var interfaceName in serviceConfig.Keys)

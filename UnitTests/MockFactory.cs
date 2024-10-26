@@ -1,8 +1,5 @@
-﻿using Common.Models;
-using Infrastructure.Services.Repositories;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Moq;
-using System.Linq.Expressions;
 
 namespace UnitTests
 {
@@ -20,15 +17,15 @@ namespace UnitTests
             await Task.Yield();     // Does nothing, but allows this method to be async
         }
 
-        public static Mock<IRepository> GetRepository()
-        {
-            var mock = new Mock<IRepository>();
+        //public static Mock<IRepository> GetRepository()
+        //{
+        //    var mock = new Mock<IRepository>();
 
-            //MockCurrencies(mock);
-            //MockFxRates(mock);
+        //    //MockCurrencies(mock);
+        //    //MockFxRates(mock);
 
-            return mock;
-        }
+        //    return mock;
+        //}
 
         //private static void MockCurrencies(Mock<IRepository> mock)
         //{

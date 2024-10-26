@@ -15,7 +15,7 @@ namespace ConsoleApp
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
 
             var configuration = new ConfigurationBuilder()
-                .AddUserSecrets<Program>() // Make sure this points to your secrets.json
+                .AddUserSecrets<Program>() 
                 .Build();
 
             var loggerFactory = LoggerFactory.Create(builder =>

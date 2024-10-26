@@ -21,12 +21,24 @@ namespace Infrastructure.Migrations
                     SyncSet = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Field = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Type = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Value = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    SysRowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
+                    Value = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Progress", x => new { x.SyncSet, x.Field });
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Settings",
+                schema: "dbo",
+                columns: table => new
+                {
+                    Key = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Value = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Settings", x => x.Key);
                 });
         }
 
@@ -35,6 +47,10 @@ namespace Infrastructure.Migrations
         {
             migrationBuilder.DropTable(
                 name: "Progress",
+                schema: "dbo");
+
+            migrationBuilder.DropTable(
+                name: "Settings",
                 schema: "dbo");
         }
     }

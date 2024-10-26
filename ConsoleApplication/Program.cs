@@ -21,15 +21,13 @@ namespace ConsoleApp
 
         static async Task<int> Main(string[] args)
         {
-            Console.WriteLine("Application Startup");
-
             // Update the console window's title
             var name = Assembly.GetExecutingAssembly()?.GetName()?.Name;
             if (!string.IsNullOrEmpty(name))
                 Console.Title = name;
 
             // Build the application and register all services
-            var runningFromPackageManager = args.Contains("--applicationName");
+            var isRunningFromPackageManager = args.Contains("--applicationName");
 
             var host = Host
                 .CreateDefaultBuilder()
@@ -46,7 +44,7 @@ namespace ConsoleApp
                 .ConfigureServices((context, services) =>
                 {
                     services.AddSingleton(context.Configuration);
-                    if (!runningFromPackageManager)
+                    if (!isRunningFromPackageManager)
                         services.RegisterApplicationLogicServices(context.Configuration);
                     services.RegisterInfrastructureServices(context.Configuration);
                 })
@@ -56,9 +54,10 @@ namespace ConsoleApp
 
             // Get a logger
             _log = ServiceFactory.GetRequiredService<ILogger<Program>>();
+            _log.Here().LogInformation("ServiceFactory Initialised");
 
             // If we're running from the package manager, bail out at this point
-            if (runningFromPackageManager)
+            if (isRunningFromPackageManager)
                 return -1;
 
             // Ensure that the database is up-to-date
@@ -66,8 +65,6 @@ namespace ConsoleApp
 
             try
             {
-                // TODO... Single instance at a time - don't allow overlap
-
                 var worker = ServiceFactory.CreateInstance<SyncService>();
                 await worker.DoWorkAsync(args);
 

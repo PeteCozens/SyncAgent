@@ -1,20 +1,108 @@
-﻿using Azure.Identity;
-using Common.Extensions;
+﻿using Common.Extensions;
 using Common.Models;
-using Infrastructure.Services.Repositories;
+using Infrastructure.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
-using System.Text.RegularExpressions;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace ApplicationLogic.Services
 {
-    public class SyncService(ILogger<SyncService> log, IConfiguration config, IRepository repo) : IApplicationLogic
+    public class SyncService(ILogger<SyncService> log, IConfiguration config, AppDbContext db) : IApplicationLogic
     {
+        private Dictionary<string, SqlConnection> Connections = new (StringComparer.CurrentCultureIgnoreCase);
+
+        /// <summary>
+        /// Checks the database to see if another sync is running before syncing data according to the jobs specified
+        /// </summary>
+        /// <param name="jobsToRun"></param>
+        /// <returns></returns>
         public async Task DoWorkAsync(string[] jobsToRun)
+        {
+            Connections.Clear();
+
+            log.Here().LogInformation("DoWorkAsync");
+
+            // Check to see if the sync is already running by checking for a lock on the database
+
+            const string key = "lock";
+
+            var appLock = db.Settings.SingleOrDefault(x => x.Key == key);
+            if (appLock == null)
+            {
+                appLock = new Setting { Key = key };
+                db.Settings.Add(appLock);
+            }
+            else
+            {
+                if(!string.IsNullOrEmpty(appLock.Value))
+                {
+                    // Application is already locked
+                    log.Here().LogWarning("Data Sync is unable to run as another instance is currently running with the following arguments: {args}", jobsToRun);
+                    return;
+                }
+            }
+
+            // Place a lock in the database
+
+            log.LogDebug("Applying sync lock");
+            appLock.Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            await db.SaveChangesAsync();
+
+            // Perform the sync
+
+            try
+            {
+                await ExecuteSyncJobsAsync(jobsToRun);
+            }
+            catch (Exception e)
+            {
+                log.Here().LogError(e, "Unhandled exception thrown whilst running Data Sync");
+                throw;
+            }
+            finally
+            {
+                // Whatever happens, remove the lock
+                log.Here().LogDebug("Releasing sync lock");
+                appLock.Value = string.Empty;
+                await db.SaveChangesAsync();
+            }
+
+            // Tidy up
+
+            foreach (var con in Connections.Values)
+            {
+                await con.CloseAsync();
+                await con.DisposeAsync();
+            }
+            Connections.Clear();
+        }
+
+        private async Task<SqlConnection> GetConnection(string name)
+        {
+            if (Connections.TryGetValue(name, out var con))
+                return con;
+
+            var cs = config.GetConnectionString(name);
+            con = new SqlConnection(cs);
+            try
+            {
+                await con.OpenAsync();
+                Connections.Add(name, con); 
+                return con;
+            }
+            catch (Exception e)
+            {
+                log.Here().LogError(e, "Unable to connect to the SQL database {database}", name);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Data Synchronisation processing
+        /// </summary>
+        /// <param name="jobsToRun">list of sync jobs to be run</param>
+        /// <returns></returns>
+        private async Task ExecuteSyncJobsAsync(string[] jobsToRun)
         {
             var syncJobs = config.GetRequiredSection<Dictionary<string, string[]>>("syncJobs");
             var syncSets = config.GetRequiredSection<Dictionary<string, SyncSet>>("syncSets");
@@ -53,8 +141,7 @@ namespace ApplicationLogic.Services
 
                     // Fetch existing progress for this SyncSet
 
-                    var progressToDate = (await repo.GetProgressAsync(x => x.SyncSet == syncSetName, true))
-                        .ToDictionary(x => x.Field, StringComparer.CurrentCultureIgnoreCase);
+                    var progressToDate = db.Progress.Where(x => x.SyncSet == syncSetName).ToDictionary(x => x.Field, StringComparer.CurrentCultureIgnoreCase);
 
                     // Connect to the specified database
 
@@ -78,32 +165,8 @@ namespace ApplicationLogic.Services
 
                     // Build the SQL Query
 
-                    var missingProgress = false;
                     var cmd = new SqlCommand(syncSet.Sql, con);
-                    foreach (var fieldName in syncSet.Progress)
-                    {
-                        if (!progressToDate.TryGetValue(fieldName, out var progress))
-                            missingProgress = true;
-
-                        if (progress?.Value == null)
-                        {
-                            cmd.Parameters.AddWithValue(fieldName, DBNull.Value);
-                            continue;
-                        }
-
-                        var dataType = Type.GetType(progress.Type) ?? typeof(string);
-                        var value = Convert.ChangeType(progress.Value, dataType);
-
-                        //object value = progress.Type switch
-                        //{
-                        //    "System.DateTime" => Convert.ToDateTime(progress.Value),
-                        //    "System.Int32" => Convert.ToInt32(progress.Value),
-                        //    "System.Decimal" => Convert.ToDecimal(progress.Value),
-                        //    _ => progress.Value,
-                        //};
-
-                        cmd.Parameters.AddWithValue(fieldName, value);
-                    }
+                    var missingProgress = AddProgressParameters(syncSet, progressToDate, cmd);
 
                     // Execute the SQL Query
 
@@ -115,7 +178,7 @@ namespace ApplicationLogic.Services
                     catch (Exception e)
                     {
                         log.Here().LogError(e, "An error occurred executing the SQL query for {syncSet}", syncSetName);
-                        throw;
+                        continue;
                     }
 
                     if (!dr.HasRows)
@@ -127,42 +190,9 @@ namespace ApplicationLogic.Services
                     // Ensure that we have all the records we need to record progress
 
                     if (missingProgress)
-                    {
-                        var columnTypes = Enumerable.Range(0, dr.FieldCount)
-                            .ToDictionary(i => dr.GetName(i), i => dr.GetFieldType(i).FullName);
+                        await AddMissingProgressRecords(syncSetName, syncSet, dr, progressToDate);
 
-                        foreach (var progressField in syncSet.Progress)
-                        {
-                            if (progressToDate.ContainsKey(progressField))
-                                continue;
-
-                            var columnType = columnTypes[progressField];
-                            if (columnType == null)
-                            {
-                                log.Here().LogError("Unable to store the progress of field {field} in Sync Set {syncSet} as it does not exist in the data retrieved", progressField, syncSetName);
-                                continue;
-                            }
-
-                            var progress = new Progress { SyncSet = syncSetName, Field = progressField, Type = columnType, Value = null };
-                            progress = await repo.SaveAsync(progress, false);
-                            progressToDate.Add(progressField, progress);
-                        }
-
-                        await repo.FlushAsync();
-                    }
-
-                    // Create sql connections for any additional data queryies
-
-                    var connections = syncSet.AdditionalData
-                        .Select(x => x.Connection)
-                        .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                        .ToDictionary(x => x, x =>
-                        {
-                            var cs = config.GetConnectionString(x);
-                            var con = new SqlConnection(cs);
-                            con.Open();
-                            return con;
-                        }, StringComparer.CurrentCultureIgnoreCase);
+                    var connections = GetAdditionalDataConnections(config, syncSet);
 
                     // Read the data and upload to the API
 
@@ -172,116 +202,256 @@ namespace ApplicationLogic.Services
                         // Extract the data for this row
 
                         var row = GetRow(dr);
-
-                        // Get any additional properties for this record
-
-                        if (syncSet.AdditionalData != null)
-                        {
-                            foreach (var data in syncSet.AdditionalData)
-                            {
-                                var connection = connections[data.Connection];
-                                using SqlDataReader reader = ExecuteReader(connection, data.Sql, row);
-                                if (!reader.HasRows)
-                                    continue;
-
-                                await reader.ReadAsync();
-
-                                for (var i = 0; i < reader.FieldCount; i++)
-                                {
-                                    var fieldName = reader.GetName(i);
-                                    if (row.ContainsKey(fieldName))
-                                        continue;
-                                    row.Add(fieldName, reader.GetValue(i));
-                                }
-                            }
-                        }
-
-                        // Add any Collections
-
-                        if (syncSet.Collections != null)
-                        {
-                            foreach (var propertyName in syncSet.Collections.Keys)
-                            {
-                                if (collectionConnection == null)
-                                {
-                                    var ccs = config.GetConnectionString(syncSet.Connection);
-                                    collectionConnection = new SqlConnection(ccs);
-                                    await collectionConnection.OpenAsync();
-                                }
-
-                                if (!syncSet.Collections.TryGetValue(propertyName, out var sql) || string.IsNullOrEmpty(sql))
-                                    continue;
-
-                                using var reader = ExecuteReader(collectionConnection, sql, row);
-                                if (!reader.HasRows)
-                                    continue;
-
-                                var items = new List<Dictionary<string, object>>();
-                                while (await reader.ReadAsync())
-                                    items.Add(GetRow(reader));
-                                row.Add(propertyName, items);
-                            }
-                        }
-
-                        // Get any additional files to include in the upload
-
-                        var includedFiles = new List<IncludedFile>();
-                        if (syncSet.Files != null)
-                        {
-                            foreach (var includedFile in syncSet.Files)
-                            {
-                                var path = includedFile.Path.ReplacePlaceholders(row);
-                                if (!File.Exists(path))
-                                    continue; // File not found
-
-                                var name = string.IsNullOrEmpty(includedFile.Name)
-                                    ? Path.GetFileName(path)
-                                    : includedFile.Name.ReplacePlaceholders(row);
-
-                                includedFiles.Add(new IncludedFile { Path = path, Name = name });
-                            }
-                        }
+                        await PopulateAdditionalData(syncSet, connections, row);
+                        await PopulateCollections(syncSet, collectionConnection, row);
+                        var includedFiles = GetIncludedFiles(syncSet, row);
 
                         // Upload the object to the API
 
-                        var json = row.ToJson(true);
-                        Console.WriteLine($"{syncSet.Verb} to {syncSet.Url}: {json}");
+                        log.LogDebug("{verb} to {url}: {payload}", syncSet.Verb, syncSet.Url, row);
 
                         // TODO... Upload the row to the API
                         // TODO... Include any IncludedFiles in the call
 
                         // Update our progress in the local DB
 
-                        foreach (var progressField in syncSet.Progress)
-                        {
-                            var p = progressToDate[progressField];
-                            p.Value = p.Type switch
-                            {
-                                "System.DateTime" => string.Format("{0:yyyy-MM-dd HH:mm:ss.ffffff}", row[progressField]),
-                                _ => row[progressField].ToString()
-                            };
-                            await repo.SaveAsync(p, false);
-                        }
-                        await repo.FlushAsync();
+                        await UpdateProgress(syncSet, progressToDate, row);
                     }
 
                     // Tidy up
 
-                    collectionConnection?.Dispose();
-
                     foreach (var sqlConnection in connections.Values)
                         await sqlConnection.DisposeAsync();
+
+                    collectionConnection?.Dispose();
                 }
             }
 
             // Done.
         }
 
+        /// <summary>
+        /// Adds parameters to the SqlCommand specified to indicate sync progress to date
+        /// </summary>
+        /// <param name="syncSet"></param>
+        /// <param name="progressToDate"></param>
+        /// <param name="cmd"></param>
+        /// <returns></returns>
+        private static bool AddProgressParameters(SyncSet syncSet, Dictionary<string, Progress> progressToDate, SqlCommand cmd)
+        {
+            var missingProgress = false;
+            foreach (var fieldName in syncSet.Progress)
+            {
+                if (!progressToDate.TryGetValue(fieldName, out var progress))
+                    missingProgress = true;
+
+                if (progress?.Value == null)
+                {
+                    cmd.Parameters.AddWithValue(fieldName, DBNull.Value);
+                    continue;
+                }
+
+                var dataType = Type.GetType(progress.Type) ?? typeof(string);
+                var value = Convert.ChangeType(progress.Value, dataType);
+
+                cmd.Parameters.AddWithValue(fieldName, value);
+            }
+
+            return missingProgress;
+        }
+
+        /// <summary>
+        /// Update the current progress in the database, so that next time the sync runs we're not trying to sync the same records
+        /// </summary>
+        /// <param name="syncSet"></param>
+        /// <param name="progressToDate"></param>
+        /// <param name="row"></param>
+        /// <returns></returns>
+        private async Task UpdateProgress(SyncSet syncSet, Dictionary<string, Progress> progressToDate, Dictionary<string, object> row)
+        {
+            foreach (var progressField in syncSet.Progress)
+            {
+                var p = progressToDate[progressField];
+                p.Value = p.Type switch
+                {
+                    "System.DateTime" => string.Format("{0:yyyy-MM-dd HH:mm:ss.ffffff}", row[progressField]),
+                    _ => row[progressField].ToString()
+                };
+            }
+            await db.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Returns a list of the files that need to be included with this record when it is uploaded
+        /// </summary>
+        /// <param name="syncSet"></param>
+        /// <param name="row"></param>
+        /// <returns></returns>
+        private static List<IncludedFile> GetIncludedFiles(SyncSet syncSet, Dictionary<string, object> row)
+        {
+            // Get any additional files to include in the upload
+
+            var includedFiles = new List<IncludedFile>();
+            if (syncSet.Files != null)
+            {
+                foreach (var includedFile in syncSet.Files)
+                {
+                    var path = includedFile.Path.ReplacePlaceholders(row);
+                    if (!File.Exists(path))
+                        continue; // File not found
+
+                    var name = string.IsNullOrEmpty(includedFile.Name)
+                        ? Path.GetFileName(path)
+                        : includedFile.Name.ReplacePlaceholders(row);
+
+                    includedFiles.Add(new IncludedFile { Path = path, Name = name });
+                }
+            }
+
+            return includedFiles;
+        }
+
+        /// <summary>
+        /// Queries the relevant database(s) for any collection properties to be applied to the row
+        /// </summary>
+        /// <param name="syncSet"></param>
+        /// <param name="collectionConnection"></param>
+        /// <param name="row"></param>
+        /// <returns></returns>
+        private async Task PopulateCollections(SyncSet syncSet, SqlConnection? collectionConnection, Dictionary<string, object> row)
+        {
+            if (syncSet.Collections == null)
+                return;
+
+            foreach (var propertyName in syncSet.Collections.Keys)
+            {
+                if (collectionConnection == null)
+                {
+                    var ccs = config.GetConnectionString(syncSet.Connection);
+                    collectionConnection = new SqlConnection(ccs);
+                    await collectionConnection.OpenAsync();
+                }
+
+                if (!syncSet.Collections.TryGetValue(propertyName, out var sql) || string.IsNullOrEmpty(sql))
+                    continue;
+
+                using var reader = ExecuteReader(collectionConnection, sql, row);
+                if (!reader.HasRows)
+                    continue;
+
+                var items = new List<Dictionary<string, object>>();
+                while (await reader.ReadAsync())
+                    items.Add(GetRow(reader));
+                row.Add(propertyName, items);
+            }
+        }
+
+        /// <summary>
+        /// Queries the relevant database(s) for any additional properties to be applied to the row from alternate data sources
+        /// </summary>
+        /// <param name="syncSet"></param>
+        /// <param name="connections"></param>
+        /// <param name="row"></param>
+        /// <returns></returns>
+        private static async Task PopulateAdditionalData(SyncSet syncSet, Dictionary<string, SqlConnection> connections, Dictionary<string, object> row)
+        {
+            if (syncSet.AdditionalData == null)
+                return;
+
+            foreach (var data in syncSet.AdditionalData)
+            {
+                var connection = connections[data.Connection];
+                using SqlDataReader reader = ExecuteReader(connection, data.Sql, row);
+                if (!reader.HasRows)
+                    continue;
+
+                await reader.ReadAsync();
+
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    var fieldName = reader.GetName(i);
+                    if (row.ContainsKey(fieldName))
+                        continue;
+                    row.Add(fieldName, reader.GetValue(i));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Compiles a dictionary on SqlConnections for all the database(s) that are required to fetch the additional data
+        /// </summary>
+        /// <param name="config"></param>
+        /// <param name="syncSet"></param>
+        /// <returns></returns>
+        private static Dictionary<string, SqlConnection> GetAdditionalDataConnections(IConfiguration config, SyncSet syncSet)
+        {
+
+            // Create sql connections for any additional data queryies
+
+            return syncSet.AdditionalData
+                .Select(x => x.Connection)
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .ToDictionary(x => x, x =>
+                {
+                    var cs = config.GetConnectionString(x);
+                    var con = new SqlConnection(cs);
+                    con.Open();
+                    return con;
+                }, StringComparer.CurrentCultureIgnoreCase);
+        }
+
+        /// <summary>
+        /// If we're missing any progress records (should only be the first time the sync is run), then create them, ready to be 
+        /// saved to the database once the first data record is sync'd
+        /// </summary>
+        /// <param name="syncSetName"></param>
+        /// <param name="syncSet"></param>
+        /// <param name="dr"></param>
+        /// <param name="progressToDate"></param>
+        /// <returns></returns>
+        private async Task AddMissingProgressRecords(string syncSetName, SyncSet syncSet, SqlDataReader dr, Dictionary<string, Progress> progressToDate)
+        {
+            var columnTypes = Enumerable.Range(0, dr.FieldCount)
+                .ToDictionary(i => dr.GetName(i), i => dr.GetFieldType(i).FullName);
+
+            foreach (var progressField in syncSet.Progress)
+            {
+                if (progressToDate.ContainsKey(progressField))
+                    continue;
+
+                var columnType = columnTypes[progressField];
+                if (columnType == null)
+                {
+                    log.Here().LogError("Unable to store the progress of field {field} in Sync Set {syncSet} as it does not exist in the data retrieved", progressField, syncSetName);
+                    continue;
+                }
+
+                var progress = new Progress { SyncSet = syncSetName, Field = progressField, Type = columnType, Value = null };
+                db.Progress.Add(progress);
+                progressToDate.Add(progressField, progress);
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Reads the current row from a SqlDataReader and returns it as a dictionary
+        /// </summary>
+        /// <param name="dr"></param>
+        /// <returns></returns>
         private static Dictionary<string, object> GetRow(SqlDataReader dr)
         {
             return Enumerable.Range(0, dr.FieldCount).ToDictionary(dr.GetName, dr.GetValue);
         }
 
+        /// <summary>
+        /// Executes the specified sql query, having first extracted any paramters from the SQL script and populated them
+        /// from the paramters dictionary supplied
+        /// </summary>
+        /// <param name="con"></param>
+        /// <param name="sql"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
         private static SqlDataReader ExecuteReader(SqlConnection con, string sql, Dictionary<string, object> parameters)
         {
             var cmd = new SqlCommand(sql, con);
@@ -291,7 +461,5 @@ namespace ApplicationLogic.Services
             var reader = cmd.ExecuteReader();
             return reader;
         }
-
-
     }
 }

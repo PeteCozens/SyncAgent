@@ -15,7 +15,5 @@ namespace Common.Models
 
         [StringLength(100)]
         public string? Value { get; set; }
-
-        public byte[] SysRowVersion { get; set; } = [];
     }
 }
