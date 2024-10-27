@@ -18,8 +18,6 @@ namespace ApplicationLogic.Services
         /// <returns></returns>
         public async Task DoWorkAsync(string[] jobsToRun)
         {
-            Connections.Clear();
-
             log.Here().LogInformation("DoWorkAsync");
 
             // Check to see if the sync is already running by checking for a lock on the database
@@ -66,19 +64,13 @@ namespace ApplicationLogic.Services
                 appLock.Value = string.Empty;
                 await db.SaveChangesAsync();
             }
-
-            // Tidy up
-
-            foreach (var con in Connections.Values)
-            {
-                await con.CloseAsync();
-                await con.DisposeAsync();
-            }
-            Connections.Clear();
         }
 
         private async Task<SqlConnection> GetConnection(string name)
         {
+            if (string.IsNullOrEmpty(name))
+                name = "Default";
+
             if (Connections.TryGetValue(name, out var con))
                 return con;
 
@@ -106,6 +98,8 @@ namespace ApplicationLogic.Services
         {
             var syncJobs = config.GetRequiredSection<Dictionary<string, string[]>>("syncJobs");
             var syncSets = config.GetRequiredSection<Dictionary<string, SyncSet>>("syncSets");
+
+            Connections.Clear();
 
             // Enumerate through the configured jobs and execute any that are included in the specified list of jobs
 
@@ -192,18 +186,15 @@ namespace ApplicationLogic.Services
                     if (missingProgress)
                         await AddMissingProgressRecords(syncSetName, syncSet, dr, progressToDate);
 
-                    var connections = GetAdditionalDataConnections(config, syncSet);
-
                     // Read the data and upload to the API
 
-                    SqlConnection? collectionConnection = null;
                     while (dr.Read())
                     {
                         // Extract the data for this row
 
                         var row = GetRow(dr);
-                        await PopulateAdditionalData(syncSet, connections, row);
-                        await PopulateCollections(syncSet, collectionConnection, row);
+                        await PopulateAdditionalData(syncSet,  row);
+                        await PopulateCollections(syncSet, row);
                         var includedFiles = GetIncludedFiles(syncSet, row);
 
                         // Upload the object to the API
@@ -217,17 +208,17 @@ namespace ApplicationLogic.Services
 
                         await UpdateProgress(syncSet, progressToDate, row);
                     }
-
-                    // Tidy up
-
-                    foreach (var sqlConnection in connections.Values)
-                        await sqlConnection.DisposeAsync();
-
-                    collectionConnection?.Dispose();
                 }
             }
 
-            // Done.
+            // Tidy up
+
+            foreach (var con in Connections.Values)
+            {
+                await con.CloseAsync();
+                await con.DisposeAsync();
+            }
+            Connections.Clear();
         }
 
         /// <summary>
@@ -318,31 +309,30 @@ namespace ApplicationLogic.Services
         /// <param name="collectionConnection"></param>
         /// <param name="row"></param>
         /// <returns></returns>
-        private async Task PopulateCollections(SyncSet syncSet, SqlConnection? collectionConnection, Dictionary<string, object> row)
+        private async Task PopulateCollections(SyncSet syncSet, Dictionary<string, object> row)
         {
-            if (syncSet.Collections == null)
+            if ((syncSet.Collections == null) || (syncSet.Collections.Count == 0))  
                 return;
 
-            foreach (var propertyName in syncSet.Collections.Keys)
+
+            foreach (var key in syncSet.Collections.Keys)
             {
-                if (collectionConnection == null)
-                {
-                    var ccs = config.GetConnectionString(syncSet.Connection);
-                    collectionConnection = new SqlConnection(ccs);
-                    await collectionConnection.OpenAsync();
-                }
+                var subQuery = syncSet.Collections[key];
 
-                if (!syncSet.Collections.TryGetValue(propertyName, out var sql) || string.IsNullOrEmpty(sql))
-                    continue;
+                var connectionName = string.IsNullOrEmpty(subQuery.Connection)
+                    ? syncSet.Connection
+                    : subQuery.Connection;
 
-                using var reader = ExecuteReader(collectionConnection, sql, row);
+                var connection = await GetConnection(connectionName);
+
+                using var reader = ExecuteReader(connection, subQuery.Sql, row);
                 if (!reader.HasRows)
                     continue;
 
                 var items = new List<Dictionary<string, object>>();
                 while (await reader.ReadAsync())
                     items.Add(GetRow(reader));
-                row.Add(propertyName, items);
+                row.Add(key, items);
             }
         }
 
@@ -353,14 +343,19 @@ namespace ApplicationLogic.Services
         /// <param name="connections"></param>
         /// <param name="row"></param>
         /// <returns></returns>
-        private static async Task PopulateAdditionalData(SyncSet syncSet, Dictionary<string, SqlConnection> connections, Dictionary<string, object> row)
+        private async Task PopulateAdditionalData(SyncSet syncSet, Dictionary<string, object> row)
         {
             if (syncSet.AdditionalData == null)
                 return;
 
             foreach (var data in syncSet.AdditionalData)
             {
-                var connection = connections[data.Connection];
+                var connectionName = string.IsNullOrEmpty(data.Connection) 
+                    ? syncSet.Connection
+                    : data.Connection;
+
+                var connection = await GetConnection(connectionName);
+
                 using SqlDataReader reader = ExecuteReader(connection, data.Sql, row);
                 if (!reader.HasRows)
                     continue;
@@ -375,29 +370,6 @@ namespace ApplicationLogic.Services
                     row.Add(fieldName, reader.GetValue(i));
                 }
             }
-        }
-
-        /// <summary>
-        /// Compiles a dictionary on SqlConnections for all the database(s) that are required to fetch the additional data
-        /// </summary>
-        /// <param name="config"></param>
-        /// <param name="syncSet"></param>
-        /// <returns></returns>
-        private static Dictionary<string, SqlConnection> GetAdditionalDataConnections(IConfiguration config, SyncSet syncSet)
-        {
-
-            // Create sql connections for any additional data queryies
-
-            return syncSet.AdditionalData
-                .Select(x => x.Connection)
-                .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                .ToDictionary(x => x, x =>
-                {
-                    var cs = config.GetConnectionString(x);
-                    var con = new SqlConnection(cs);
-                    con.Open();
-                    return con;
-                }, StringComparer.CurrentCultureIgnoreCase);
         }
 
         /// <summary>
